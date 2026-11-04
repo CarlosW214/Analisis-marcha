@@ -34,8 +34,10 @@ py -m pip install --no-deps rtmlib==0.0.16
 `opencv-contrib-python` (el que necesita MediaPipe). Si ya tenía instalado `opencv-python`
 de la versión anterior, conviene usar un entorno nuevo (lo que hace el .bat).
 
-El experimento 3 necesita Blender (probado con 5.1). Se busca solo en
-`C:\Program Files\Blender Foundation`; si está en otro lugar, use `--blender RUTA`.
+El experimento 3 necesita Blender (probado con 5.1). Se busca en el PATH, en
+`C:\Program Files\Blender Foundation` y en la carpeta de Steam. Si está en otro lugar, el
+lanzador pide elegir `blender.exe` (o use `--blender RUTA`); la ruta se recuerda en
+`%LOCALAPPDATA%\AnalisisMarcha\blender.txt`.
 
 ## Flujo de trabajo
 

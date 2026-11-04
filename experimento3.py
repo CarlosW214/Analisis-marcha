@@ -11,10 +11,7 @@
 """
 import argparse
 import json
-import re
-import shutil
 import subprocess
-from glob import glob
 from pathlib import Path
 
 import cv2
@@ -23,6 +20,7 @@ import pandas as pd
 
 import exportar_bvh
 import graficas
+import ruta_blender
 from deteccion import abrir_fuente, leer_fotogramas
 
 plt = graficas.plt
@@ -34,14 +32,14 @@ FASES = [(0, "contacto inicial"), (15, "respuesta a carga"), (30, "apoyo medio")
 
 def buscar_blender(ruta=None):
     if ruta:
+        if not ruta_blender.es_valida(ruta):
+            raise FileNotFoundError(f"No existe blender.exe en {ruta}")
+        ruta_blender.guardar(ruta)          # las siguientes veces ya no hace falta --blender
         return str(ruta)
-    if shutil.which("blender"):
-        return shutil.which("blender")
-    version = lambda p: [int(v) for v in re.findall(r"\d+", Path(p).parent.name)]  # noqa: E731
-    candidatos = sorted(glob(r"C:\Program Files\Blender Foundation\Blender*\blender.exe"), key=version)
-    if not candidatos:
+    encontrada = ruta_blender.encontrar()
+    if encontrada is None:
         raise FileNotFoundError("No se encontró Blender; indique la ruta con --blender")
-    return candidatos[-1]
+    return encontrada
 
 
 def ejecutar_blender(blender, carpeta, cuadros):

@@ -12,6 +12,8 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
+import ruta_blender
+
 AQUI = Path(__file__).resolve().parent
 RESULTADOS = AQUI / "resultados"
 UMBRALES = AQUI / "umbrales_hsv.json"
@@ -353,9 +355,32 @@ class Lanzador(tk.Tk):
                                                 "Necesita Blender instalado y puede tardar varios minutos. "
                                                 "¿Continuar?"):
             return
-        self._ejecutar("experimento3.py", [str(self.carpeta_resultados)],
+        blender = self._ruta_blender()
+        if blender is None:
+            return
+        self._ejecutar("experimento3.py", [str(self.carpeta_resultados), "--blender", blender],
                        lambda codigo: self._abrir_carpeta() if codigo == 0 else
                        messagebox.showerror("Modelo 3D", "No terminó; revise los mensajes (¿está instalado Blender?)."))
+
+    def _ruta_blender(self):
+        """blender.exe encontrado o elegido por el usuario (se recuerda); None si cancela."""
+        ruta = ruta_blender.encontrar()
+        if ruta is not None:
+            return ruta
+        messagebox.showinfo("Modelo 3D", "No se encontró Blender en este equipo.\n\n"
+                                         "En la siguiente ventana busque y elija el archivo blender.exe "
+                                         "(por ejemplo, en Steam: C:\\Program Files (x86)\\Steam\\steamapps\\"
+                                         "common\\Blender). Se recordará para las siguientes veces.")
+        while True:
+            ruta = filedialog.askopenfilename(title="Elegir blender.exe",
+                                              filetypes=[("Blender", "blender.exe"), ("Programas", "*.exe")])
+            if not ruta:
+                return None
+            if ruta_blender.es_valida(ruta):
+                ruta_blender.guardar(ruta)
+                return ruta
+            if not messagebox.askretrycancel("Modelo 3D", "Ese archivo no es blender.exe. ¿Elegir otro?"):
+                return None
 
     def _ver_comparacion(self):
         if self.carpeta_resultados is not None:
