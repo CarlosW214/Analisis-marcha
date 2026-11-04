@@ -1,0 +1,17 @@
+{
+  "estatura_m": 1.680075,
+  "m_por_px": 0.0021033,
+  "metodo_escala": "estatura (pierna = 0.246 H)",
+  "muslo_m": 0.3683445143519357,
+  "pierna_m": 0.41362998073190876,
+  "tobillo_h_m": 0.065522925,
+  "pie_m": 0.25537139999999997,
+  "cadera_x_m": 0.0873639,
+  "pierna_medida": "izquierda",
+  "direccion": -1,
+  "y_suelo_px": 624.928,
+  "x_ref_px": 577.2854077586207,
+  "fps": 29.71,
+  "cuadros": 116,
+  "fotograma_inicial": 0
+}

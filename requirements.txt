@@ -1,0 +1,18 @@
+# Bibliotecas del análisis de marcha. Analisis_Marcha.bat las instala solo, en un entorno
+# aislado (%LOCALAPPDATA%\AnalisisMarcha\venv). Probado con Python 3.13, OpenCV 5.0,
+# NumPy 2.5, pandas 3.1, ONNX Runtime 1.31 y MediaPipe 1.2.
+#
+# Instalación manual equivalente:
+#   python -m pip install -r requirements.txt
+#   python -m pip install --no-deps rtmlib==0.0.16
+# (rtmlib va aparte y sin dependencias: pide opencv-python, que choca con
+#  opencv-contrib-python, el que necesita MediaPipe; las demás ya están aquí.)
+opencv-contrib-python>=4.8,<6
+numpy>=1.24,<3
+scipy>=1.10,<2
+matplotlib>=3.7,<4
+pandas>=2.0,<4
+# Sin marcadores
+onnxruntime>=1.16,<2
+tqdm
+mediapipe>=0.10.30,<2

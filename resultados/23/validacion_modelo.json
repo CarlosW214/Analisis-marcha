@@ -1,0 +1,24 @@
+{
+  "cuadros": 960,
+  "error_angular_max_deg": {
+    "derecha_cadera": 7e-06,
+    "derecha_rodilla": 9e-06,
+    "derecha_tobillo": 3.8e-05,
+    "izquierda_cadera": 8e-06,
+    "izquierda_rodilla": 9e-06,
+    "izquierda_tobillo": 3.7e-05
+  },
+  "error_angular_rms_deg": {
+    "derecha_cadera": 4e-06,
+    "derecha_rodilla": 2e-06,
+    "derecha_tobillo": 2e-05,
+    "izquierda_cadera": 4e-06,
+    "izquierda_rodilla": 2e-06,
+    "izquierda_tobillo": 2e-05
+  },
+  "error_posicion_rms_cm": {
+    "derecha_cadera": 0.0,
+    "derecha_rodilla": 0.644,
+    "derecha_tobillo": 0.876
+  }
+}

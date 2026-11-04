@@ -1,0 +1,61 @@
+{
+  "fuente": "../23.MP4",
+  "ruta_video": "G:\\Mi unidad\\IPN\\UPIITA\\quinto\\DPI\\Proyecto\\23.MP4",
+  "vista": "lateral",
+  "fps": 29.97,
+  "cuadros_analizados": 960,
+  "duracion_s": 32.0,
+  "segmentacion": "hsv",
+  "deteccion_pct": {
+    "cadera": 100.0,
+    "rodilla": 100.0,
+    "tobillo": 100.0
+  },
+  "orden_anatomico_correcto_pct": 100.0,
+  "pierna_grabada": "derecha",
+  "direccion_marcha": "derecha",
+  "ciclos_validos": 24,
+  "tramo_tomado_como_un_ciclo": false,
+  "duracion_ciclo_s": [
+    1.265,
+    0.023
+  ],
+  "cadencia_pasos_min": 94.9,
+  "fase_apoyo_pct": [
+    64.5,
+    0.6
+  ],
+  "unidad_altura": "px",
+  "escala": {
+    "m_por_px": null,
+    "metodo": null,
+    "diametro_marcador_px": 114.7,
+    "pierna_px": 455.0
+  },
+  "rango_articular_deg": {
+    "cadera": {
+      "min": -8.9,
+      "max": 17.4
+    },
+    "rodilla": {
+      "min": 0.3,
+      "max": 60.7
+    },
+    "tobillo": {
+      "min": -12.5,
+      "max": 51.5
+    }
+  },
+  "por_pierna": {
+    "derecha": {
+      "ciclos": 24,
+      "apoyo_pct": 64.50112291208524,
+      "origen": "medida"
+    },
+    "izquierda": {
+      "ciclos": 24,
+      "apoyo_pct": 64.50112291208524,
+      "origen": "sintetica"
+    }
+  }
+}

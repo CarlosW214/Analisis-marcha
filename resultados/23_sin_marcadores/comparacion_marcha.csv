@@ -1,0 +1,7 @@
+marcha_ideal,articulacion,pierna,origen,ciclos,min,max,rango,normal_min,normal_max,normal_rango,dif_media,dif_rms,correlacion,fuera_banda_pct,de_media_prueba
+Normal: adultos sanos (n = 10),cadera,derecha,medida,24,-10.85,21.4,32.25,-9.72,27.92,37.64,-4.63,5.29,0.99,51.49,0.87
+Normal: adultos sanos (n = 10),cadera,izquierda,sintetica,24,-10.85,21.4,32.25,-9.72,27.92,37.64,-4.63,5.29,0.99,51.49,0.87
+Normal: adultos sanos (n = 10),rodilla,derecha,medida,24,-1.13,64.11,65.24,3.12,68.21,65.09,-3.75,5.02,0.99,48.51,1.54
+Normal: adultos sanos (n = 10),rodilla,izquierda,sintetica,24,-1.13,64.11,65.24,3.12,68.21,65.09,-3.75,5.02,0.99,48.51,1.54
+Normal: adultos sanos (n = 10),tobillo,derecha,medida,24,-14.16,18.98,33.14,-9.79,15.23,25.01,-0.58,2.54,0.96,23.76,1.37
+Normal: adultos sanos (n = 10),tobillo,izquierda,sintetica,24,-14.16,18.98,33.14,-9.79,15.23,25.01,-0.58,2.54,0.96,23.76,1.37

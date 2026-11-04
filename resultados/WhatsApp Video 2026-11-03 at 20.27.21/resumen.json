@@ -1,0 +1,63 @@
+{
+  "fuente": "C:/Users/carlo/Downloads/WhatsApp Video 2026-11-03 at 20.27.21.mp4",
+  "ruta_video": "C:\\Users\\carlo\\Downloads\\WhatsApp Video 2026-11-03 at 20.27.21.mp4",
+  "vista": "lateral",
+  "metodo": "marcadores de color",
+  "fps": 29.71,
+  "cuadros_analizados": 116,
+  "duracion_s": 3.87,
+  "segmentacion": "hsv",
+  "deteccion_pct": {
+    "cadera": 87.9,
+    "rodilla": 94.0,
+    "tobillo": 81.0
+  },
+  "orden_anatomico_correcto_pct": 100.0,
+  "pierna_grabada": "izquierda",
+  "direccion_marcha": "izquierda",
+  "ciclos_validos": 1,
+  "tramo_tomado_como_un_ciclo": false,
+  "duracion_ciclo_s": [
+    1.73,
+    0.0
+  ],
+  "cadencia_pasos_min": 69.3,
+  "fase_apoyo_pct": [
+    66.9,
+    0.0
+  ],
+  "tobillo_con_pie": false,
+  "unidad_altura": "cm",
+  "escala": {
+    "m_por_px": 0.0021033,
+    "metodo": "estatura (pierna = 0.246 H)",
+    "diametro_marcador_px": 42.0,
+    "pierna_px": 196.5
+  },
+  "rango_articular_deg": {
+    "cadera": {
+      "min": -12.4,
+      "max": 22.3
+    },
+    "rodilla": {
+      "min": -2.1,
+      "max": 52.4
+    },
+    "tobillo": {
+      "min": -22.4,
+      "max": 42.9
+    }
+  },
+  "por_pierna": {
+    "izquierda": {
+      "ciclos": 1,
+      "apoyo_pct": 66.873958962963,
+      "origen": "medida"
+    },
+    "derecha": {
+      "ciclos": 1,
+      "apoyo_pct": 66.873958962963,
+      "origen": "sintetica"
+    }
+  }
+}
