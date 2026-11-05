@@ -5,9 +5,15 @@ Convención de coordenadas de imagen: x crece a la derecha, y crece hacia abajo.
 hacia la izquierda; así "adelante" siempre tiene signo positivo.
 """
 import numpy as np
+from scipy.ndimage import uniform_filter1d
 from scipy.signal import butter, filtfilt, find_peaks
 
 # El patrón normal (media ± DE) está en normativa.py / datos/normativa_uci.csv.
+
+# Alturas de pie como fracción de la estatura H (Winter, 2009): trocánter mayor,
+# rodilla (epicóndilo femoral) y maléolo externo, los puntos de los marcadores.
+ALTURA_DE_PIE_H = {"cadera": 0.530, "rodilla": 0.285, "tobillo": 0.039}
+PIERNA_H = ALTURA_DE_PIE_H["cadera"] - ALTURA_DE_PIE_H["tobillo"]      # cadera-tobillo = 0.491 H
 
 
 def angulos_sagitales(cadera, rodilla, tobillo, direccion, talon=None, punta=None):
@@ -85,6 +91,28 @@ def detectar_direccion(x_cadera, x_tobillo):
     return 1 if np.mean(v > 0) < 0.5 else -1
 
 
+def suavizar_lento(senal, fs, ventana_s):
+    """Media móvil de `ventana_s` segundos (p. ej. un ciclo): deja solo los cambios lentos."""
+    return uniform_filter1d(np.asarray(senal, float), max(3, int(round(ventana_s * fs))), mode="nearest")
+
+
+def reposo_inicial(senal, fs, umbral=0.03, minimo_s=0.5, margen_s=0.2):
+    """Cuadros del inicio en que la persona está de pie y quieta, antes de echar a andar.
+
+    senal: diferencia de altura entre los tobillos dividida entre la longitud de la
+    pierna; de pie, con los pies juntos, es ~0 y no cambia. El reposo termina cuando
+    se aparta más de `umbral` de su valor inicial. Regresa un slice, o None si el
+    video no empieza con la persona quieta (al menos `minimo_s`).
+    """
+    senal = np.asarray(senal, float)
+    base = np.median(senal[:max(3, int(0.3 * fs))])
+    if abs(base) > 2 * umbral:                      # no empieza con los pies juntos
+        return None
+    fuera = np.flatnonzero(np.abs(senal - base) > umbral)
+    fin = (fuera[0] if fuera.size else senal.size) - int(margen_s * fs)
+    return slice(0, fin) if fin >= minimo_s * fs else None
+
+
 def _estimar_periodo(senal, fs, t_min=0.6, t_max=2.5):
     s = senal - senal.mean()
     ac = np.correlate(s, s, mode="full")[s.size - 1:]
@@ -112,40 +140,54 @@ def detectar_eventos(t, x_cadera, x_tobillo, direccion, fs):
     """
     rel = direccion * (x_tobillo - x_cadera)
     periodo = _estimar_periodo(rel, fs)
+    maximos, minimos = _maximos_y_minimos(t, rel, fs, periodo)
+    return maximos, minimos, periodo
+
+
+def _maximos_y_minimos(t, senal, fs, periodo):
+    """Tiempos (entre cuadros) de los máximos y mínimos de una señal casi periódica."""
     distancia = max(1, int(0.6 * periodo * fs)) if periodo else 1
-    prominencia = 0.3 * (np.percentile(rel, 95) - np.percentile(rel, 5))
+    prominencia = 0.3 * (np.percentile(senal, 95) - np.percentile(senal, 5))
     idx = np.arange(t.size)
     tiempos = []
-    for s in (rel, -rel):
+    for s in (senal, -senal):
         picos, _ = find_peaks(s, distance=distancia, prominence=prominencia)
         tiempos.append(np.interp([_refinar_pico(s, i) for i in picos], idx, t))
-    return tiempos[0], tiempos[1], periodo
+    return tiempos[0], tiempos[1]
 
 
-def detectar_contactos_altura(t, altura_tobillo, fs, fraccion=0.25, adelanto=0.11):
-    """Contacto inicial a partir de la altura del tobillo (vista frontal).
+def periodo_frontal(t, y_tobillo_der, y_tobillo_izq, fs, frente="camara"):
+    """Duración del ciclo en la vista frontal (s) o None.
 
-    En la vista frontal el pie avanza hacia la cámara, así que no sirve el
-    método de Zeni. Tras cada pico de balanceo se busca el instante en que el
-    tobillo baja al 25 % de la amplitud del balanceo; en los videos laterales
-    21 y 23 ese cruce se adelanta al contacto real 11 % del ciclo (DE < 0.5 %),
-    y se corrige.
+    Por la perspectiva, el pie adelantado se ve más abajo en la imagen si el sujeto
+    camina hacia la cámara, así que y_der - y_izq oscila una vez por ciclo; al ser una
+    diferencia entre tobillos, no la afecta que la cámara se mueva. Se mide entre sus
+    máximos (o mínimos) y, si solo hay uno de cada, como el doble del paso.
     """
-    periodo = _estimar_periodo(altura_tobillo, fs)
-    distancia = max(1, int(0.6 * periodo * fs)) if periodo else 1
-    picos, _ = find_peaks(altura_tobillo, distance=distancia, prominence=0.3 * np.ptp(altura_tobillo))
-    base = np.percentile(altura_tobillo, 5)
-    contactos = []
-    for p in picos:
-        umbral = base + fraccion * (altura_tobillo[p] - base)
-        debajo = np.flatnonzero(altura_tobillo[p:] <= umbral)
-        if debajo.size == 0:
-            continue
-        j = p + debajo[0]
-        a, b = altura_tobillo[j - 1], altura_tobillo[j]       # cruce interpolado entre cuadros
-        tc = t[j - 1] + (a - umbral) / (a - b) * (t[j] - t[j - 1]) if a != b else t[j]
-        contactos.append(tc + adelanto * (periodo or 0))
-    return np.array(contactos), periodo
+    g = (1 if frente == "camara" else -1) * (np.asarray(y_tobillo_der) - np.asarray(y_tobillo_izq))
+    periodo = _estimar_periodo(g, fs, t_max=4.0)
+    maximos, minimos = _maximos_y_minimos(t, g, fs, periodo)
+    entre = np.concatenate([np.diff(maximos), np.diff(minimos)])
+    if entre.size:
+        return float(np.median(entre))
+    if maximos.size and minimos.size:
+        return 2.0 * abs(float(minimos[0] - maximos[0]))
+    return periodo
+
+
+def detectar_contactos_frontal(t, y_tobillo, y_cadera, m_por_px, fs, periodo, frente="camara"):
+    """Contactos iniciales de una pierna en la vista frontal (tiempos en s).
+
+    Se usa la altura del tobillo respecto a la cadera (en m): de frente a la cámara,
+    el pie que avanza en el balanceo baja en la imagen hasta el contacto y, ya
+    apoyado, sube conforme el cuerpo pasa sobre él; el contacto es el máximo. A
+    diferencia de la separación entre los pies, no la retrasa el talón de la otra
+    pierna al despegar. En el video Marcha_frontal_ejemplo.mp4 coincide, revisando
+    los cuadros, con el pie recién apoyado (±0.1 s).
+    """
+    h = (1 if frente == "camara" else -1) * (np.asarray(y_tobillo) - np.asarray(y_cadera)) * m_por_px
+    maximos, _ = _maximos_y_minimos(t, h, fs, periodo)
+    return maximos
 
 
 def armar_ciclos(contactos, despegues, tolerancia=0.25):
@@ -163,7 +205,10 @@ def armar_ciclos(contactos, despegues, tolerancia=0.25):
 
 
 def normalizar_ciclos(t, senal, ciclos, n=101):
-    """Remuestrea cada ciclo a n puntos (0-100 % del ciclo). Regresa (n_ciclos, n)."""
+    """Remuestrea cada ciclo a n puntos (0-100 % del ciclo). Regresa (n_ciclos, n).
+
+    Si un ciclo se sale un poco del video, esa parte toma el primer o último cuadro.
+    """
     salida = []
     for t0, t1, _ in ciclos:
         salida.append(np.interp(np.linspace(t0, t1, n), t, senal))

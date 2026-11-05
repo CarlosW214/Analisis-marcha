@@ -111,7 +111,8 @@ class Lanzador(tk.Tk):
         self.k_lejana.grid(row=5, column=0, columnspan=3, sticky="w", pady=(4, 0))
         fila_estatura = ttk.Frame(f2)
         fila_estatura.grid(row=6, column=0, columnspan=3, sticky="w", pady=(6, 0))
-        ttk.Label(fila_estatura, text="Estatura del sujeto en metros (opcional, para alturas en cm):").pack(side="left")
+        self.l_estatura = ttk.Label(fila_estatura, text="")
+        self.l_estatura.pack(side="left")
         ttk.Entry(fila_estatura, textvariable=self.estatura, width=8).pack(side="left", padx=6)
         ttk.Label(fila_estatura, text="ej. 1.70", foreground="#898781").pack(side="left")
 
@@ -170,6 +171,8 @@ class Lanzador(tk.Tk):
         self.b_calibrar.configure(state="disabled" if sin else "normal")
         self.c_pierna.configure(state="readonly" if lateral else "disabled")
         self.k_lejana.configure(state="normal" if (sin and lateral) else "disabled")
+        self.l_estatura.configure(text="Estatura del sujeto en metros (opcional, para alturas en cm):" if lateral
+                                  else "Estatura del sujeto en metros (OBLIGATORIA de frente, es la escala):")
         ref = self.ideal.get() == "carpeta"
         self.e_ref.configure(state="normal" if ref else "disabled")
         self.b_ref.configure(state="normal" if ref else "disabled")
@@ -221,6 +224,10 @@ class Lanzador(tk.Tk):
         if self.vista.get() == "lateral":
             args += ["--pierna", PIERNAS[self.pierna.get()]]
         estatura = self.estatura.get().strip().replace(",", ".")
+        if not estatura and self.vista.get() == "frontal":
+            messagebox.showwarning("Estatura", "De frente, la estatura es obligatoria: con ella se pasan las "
+                                               "alturas a metros. Escríbala en metros, por ejemplo 1.70.")
+            return None
         if estatura:
             try:
                 valor = float(estatura)

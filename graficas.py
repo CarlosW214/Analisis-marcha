@@ -46,6 +46,11 @@ FILAS_FRONTAL = [
     ("frontal", "cadera", "Ángulo cadera", "Frontal"),
     ("frontal", "rodilla", "Ángulo rodilla", "Frontal"),
 ]
+FILAS_SEGMENTOS = [
+    ("segmento", "cadera_rodilla", "Distancia vertical cadera → rodilla", "Frontal"),
+    ("segmento", "rodilla_tobillo", "Distancia vertical rodilla → tobillo", "Frontal"),
+]
+PUNTOS = ("cadera", "rodilla", "tobillo", "cadera_rodilla", "rodilla_tobillo")
 
 plt.rcParams.update({
     "font.family": ["Segoe UI", "DejaVu Sans", "sans-serif"],
@@ -74,11 +79,14 @@ def curvas_desde_tabla(tabla, resumen, tipos):
     for pierna in PIERNAS:
         info = resumen["por_pierna"][pierna]
         for tipo in tipos:
-            for art in ("cadera", "rodilla", "tobillo"):
+            for art in PUNTOS:
                 col = f"{pierna}_{tipo}_{art}_media"
                 if col not in tabla:
                     continue
+                de_pie = resumen.get("de_pie_m", {}).get(pierna, {})
                 curvas[(tipo, art, pierna)] = {
+                    "relativa": resumen.get("altura_relativa", False),
+                    "de_pie": de_pie.get(f"segmento_{art}") if tipo == "segmento" else None,
                     "media": np.asarray(tabla[col], float),
                     "de": np.asarray(tabla[f"{pierna}_{tipo}_{art}_de"], float),
                     "n": info["ciclos"],
@@ -105,6 +113,13 @@ def _panel(ax, curva, pierna, tipo, art, numero, titulo, plano, normal):
         ax.set_ylabel(ETIQUETA_ANGULO[art])
     elif tipo == "frontal":
         ax.set_ylabel(ETIQUETA_FRONTAL[art])
+    elif tipo == "segmento":
+        ax.set_ylabel(f"Distancia vertical [{curva['unidad']}]")
+        if curva.get("de_pie") is not None:
+            ax.axhline(curva["de_pie"], color=TINTA_2, linewidth=1, linestyle="--", label="De pie (inicio)")
+    elif curva.get("relativa"):
+        ax.set_ylabel(f"Cambio de altura [{curva['unidad']}]")
+        ax.axhline(0, color=TINTA_2, linewidth=1, linestyle="--", label="De pie (inicio)")
     else:
         ax.set_ylabel(f"Altura [{curva['unidad']}]")
     apoyo = curva["apoyo"]
@@ -161,11 +176,17 @@ def figura_ciclos(filas, curvas, titulo, ruta, carpeta_sueltas=None, numerar=Tru
     return ruta
 
 
-def serie_temporal(t, paneles, contactos, titulo, ruta):
-    """paneles: [(etiqueta_y, [(leyenda, valores, color, grosor), ...]), ...] contra el tiempo."""
+def serie_temporal(t, paneles, contactos, titulo, ruta, reposo=None):
+    """paneles: [(etiqueta_y, [(leyenda, valores, color, grosor), ...]), ...] contra el tiempo.
+
+    reposo: (t0, t1) del tramo inicial de pie que sirve de referencia, sombreado.
+    """
     fig, ejes = plt.subplots(len(paneles), 1, figsize=(12, 2.6 * len(paneles) + 0.4), sharex=True, squeeze=False)
     ejes = ejes[:, 0]
     for ax, (etiqueta, series) in zip(ejes, paneles):
+        if reposo is not None:
+            ax.axvspan(*reposo, color=BANDA_NORMAL, alpha=0.6, linewidth=0,
+                       label="De pie (referencia)" if ax is ejes[0] else None)
         for leyenda, valores, color, grosor in series:
             ax.plot(t, valores, color=color, linewidth=grosor, label=leyenda)
         for k, tc in enumerate(contactos):

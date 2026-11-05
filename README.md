@@ -45,7 +45,7 @@ lanzador pide elegir `blender.exe` (o use `--blender RUTA`); la ruta se recuerda
 |---|---|---|
 | 0. Calibrar colores (opcional, con marcadores) | `py calibrar_hsv.py ../21.MP4` → guarda `umbrales_hsv.json` con `s` | 1 |
 | 1. Analizar el video lateral | `py analisis_marcha.py ../21.MP4` (marcadores) o `py analisis_marcha.py ../21.MP4 --metodo sin-marcadores` | 1 y 2 |
-| 2. Analizar un video frontal (opcional) | `py analisis_marcha.py frontal.mp4 --vista frontal` (admite `--metodo sin-marcadores`) | 1 y 2 |
+| 2. Analizar un video frontal (opcional) | `py analisis_marcha.py frontal.mp4 --vista frontal --estatura-m 1.60` (estatura obligatoria; admite `--metodo sin-marcadores`) | 1 y 2 |
 | 3. Combinar en las 12 gráficas (opcional) | `py reporte_12.py --lateral resultados/21 --frontal resultados/frontal` | 2 |
 | 4. Comparar con otra marcha ideal (opcional) | `py comparacion.py resultados/prueba --referencia resultados/sano` | 2 |
 | 5. Modelo 3D, validación y comparación | `py experimento3.py resultados/21` | 3 |
@@ -60,10 +60,45 @@ En la ventana: `q` termina y la barra espaciadora pausa. Para usar umbrales cali
 
 Otras opciones de `analisis_marcha.py`: `--pierna izquierda` (pierna del lado de la cámara; por
 omisión se deduce de hacia dónde camina el sujeto), `--frente espalda` (vista frontal desde atrás),
-`--diametro-marcador-cm 10` o `--estatura-m 1.70` (alturas en cm), `--modo rgb` (umbrales originales
+`--diametro-marcador-cm 10` o `--estatura-m 1.70` (alturas laterales en cm), `--modo rgb` (umbrales originales
 de `pp3.m`), `--inicio/--fin` (cuadros, desde 0: el 292 de MATLAB es el 291 aquí), `--fc` (corte del
 filtro), `--sin-ventana`, `--video-anotado`, `--referencia CARPETA` (marcha ideal para comparar).
 Sin marcadores: `--modelo mediapipe`, `--pierna-lejana medir`, `--detectar-cada N`.
+
+## Vista frontal: alturas
+
+Se pensó para videos donde la cámara se mueve con el sujeto (o el sujeto camina en su lugar),
+de frente a la cámara. Como la cámara se mueve, nada se mide contra un punto fijo de la imagen:
+
+1. **Suelo:** en cada cuadro, el tobillo más bajo (el pie apoyado).
+2. **Escala:** se calcula en cada cuadro, porque la distancia a la cámara cambia (en
+   `Marcha_frontal_ejemplo.mp4` la persona se ve 47 % más grande al final). La da la estatura
+   (cadera–tobillo de pie = 0.491 × estatura, Winter 2009) y sigue el tamaño del tronco (sin
+   marcadores) o el ancho entre los marcadores de cadera.
+3. **Punto inicial:** la postura de pie del inicio del video (se detecta sola). Cada altura se
+   grafica como **cambio respecto a cómo estaba parada la persona**, en metros, contra el % del ciclo.
+   Si el video no empieza con la persona quieta, la postura de pie se estima con la estatura (aviso).
+4. **Distancias entre articulaciones:** cadera → rodilla y rodilla → tobillo (verticales, en m),
+   con la línea de la postura de pie.
+5. **Contacto inicial:** máximo de la altura del tobillo respecto a la cadera (el pie que avanza baja
+   en la imagen hasta apoyarse). Revisado contra los cuadros del video: ±0.1 s.
+
+Archivos: `graficas_1_6.png` y `graficas/g01…g06` (gráficas 1 a 6 de la práctica),
+`graficas_frontal.png` (alturas y ángulos frontales), `distancias_articulaciones.png`,
+`serie_temporal.png` (alturas contra el tiempo, tramo de pie sombreado y escala). En
+`datos_marcha.csv`: `*_cambio_altura_m`, `*_altura_sobre_pie_apoyado_m`, `*_distancia_vertical_*_m`
+y `escala_m_por_px`; en `resumen.json`, las medidas de pie (`de_pie_m`) y cómo se calculó la escala.
+
+### Cómo grabar el video frontal
+
+- **Al empezar, 2 s de pie y quieta**, con los pies juntos, antes de caminar: es el punto inicial.
+- La persona completa en el cuadro, de la cabeza a los pies, con algo de margen abajo, todo el tiempo.
+- Cámara a la altura de la cadera (≈ 1 m), **nivelada** (sin inclinarla hacia abajo) y a distancia
+  constante; de preferencia con estabilizador o tripié con ruedas.
+- Al menos **3 ciclos** (6 pasos) a velocidad normal. Con un solo ciclo se completa con la duración
+  estimada (aviso).
+- Vertical u horizontal funcionan igual; en vertical la persona ocupa más píxeles (mejor).
+- 30 fps o más, buena luz, ropa que contraste con el fondo y pantalón que deje ver los tobillos.
 
 ## Sin marcadores (`--metodo sin-marcadores`)
 
@@ -187,10 +222,10 @@ Las 12 gráficas (`graficas_12.png`) también muestran la banda normal en los á
   derecho, y al revés.
 - Frontal: cadera + abducción, rodilla + varo.
 - Contacto inicial, lateral: tobillo lo más adelantado respecto a la cadera (Zeni et al., 2008).
-  Frontal: cruce de la altura del tobillo al 25 % del balanceo + 11 % del ciclo, calibrado con los
-  videos 21 y 23 (error ≤ 1.4 % del ciclo frente al método lateral).
-- Alturas en px salvo que se dé `--diametro-marcador-cm` o `--estatura-m`. El BVH usa esa escala o,
-  si no hay, una estatura de 1.70 m (pierna = 0.246 × estatura, Winter 2009).
+  Frontal: máximo de la altura del tobillo respecto a la cadera (ver "Vista frontal: alturas").
+- Lateral: alturas en px salvo que se dé `--diametro-marcador-cm` o `--estatura-m`. El BVH usa esa
+  escala o, si no hay, una estatura de 1.70 m (pierna = 0.246 × estatura, Winter 2009).
+  Frontal: cambio de altura en m respecto a la postura de pie (estatura obligatoria).
 
 ## Equivalencia con el código MATLAB
 
@@ -216,9 +251,8 @@ Cambios respecto a `pp3.m`:
 ## Limitaciones
 
 - Los videos 21 y 23 son laterales de la pierna derecha: la izquierda se genera con medio ciclo de
-  desfase y las alturas Y se miden en la vista lateral. La vista frontal está implementada, pero solo
-  se probó con un video sintético. Para grabarla, los marcadores deben verse de frente (cara anterior
-  de muslo, rodilla y tobillo); los de la cara lateral se ven de canto.
+  desfase y las alturas Y se miden en la vista lateral. Para la vista frontal con marcadores, estos
+  deben verse de frente (cara anterior de muslo, rodilla y tobillo); los de la cara lateral se ven de canto.
 - Tobillo: sin marcador en el pie se supone el pie horizontal. Solo vale en el apoyo medio (en el
   balanceo llega a ~55°) y en el modelo 3D el pie queda siempre horizontal.
 - Cadera: es el muslo contra la vertical, sin la inclinación de la pelvis. El patrón normal mide la
@@ -231,5 +265,9 @@ Cambios respecto a `pp3.m`:
   pierna). La primera ejecución descarga los modelos (necesita internet).
 - El tronco y los brazos del modelo 3D tienen una postura fija (sujetando los barandales).
 - El modo con cámara no se probó con una cámara real; usa el mismo flujo que con un video.
-- La vista frontal sin marcadores solo se probó para verificar que el código corre (no hay video
-  frontal real del proyecto).
+- Vista frontal: por la perspectiva, el pie que va adelante se ve más abajo en la imagen, así que la
+  "altura" del tobillo mezcla cuánto se levanta el pie con cuánto avanza o retrocede, y la de la
+  cadera sube unos centímetros cuando el pie apoyado está adelante. Es una limitación de medir alturas
+  desde el frente con una sola cámara; se reduce con la cámara nivelada a la altura de la cadera.
+  Se probó sin marcadores con `Marcha_frontal_ejemplo.mp4` y su versión vertical; con marcadores
+  usa el ancho de cadera como referencia de tamaño, sin video de prueba.

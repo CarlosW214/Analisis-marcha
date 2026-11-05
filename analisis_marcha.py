@@ -393,32 +393,124 @@ def procesar_lateral(crudo, fps, args):
     }
 
 
-def procesar_frontal(crudo, fps, args):
-    """Experimento 2 con video frontal: alturas y ángulos frontales de las dos piernas medidas."""
-    prefijos = [f"{p}_{a}" for p in PIERNAS for a in ARTICULACIONES]
-    crudo, t, fps, pos_crudo, pos = _preparar(crudo, fps, prefijos, args.fc)
-    laterales = _laterales(args.frente)
-    factor, unidad, escala = _escala(crudo, pos_crudo, "derecha_", args)
-    y_suelo = max(pos[f"{p}_tobillo"][:, 1].max() for p in PIERNAS)
+SEGMENTOS = (("cadera", "rodilla"), ("rodilla", "tobillo"))
 
-    series, norm, ciclos_por_pierna, por_pierna, supuestos = {}, {}, {}, {}, {}
+
+def _ciclos_frontal(contactos, periodo, t, nombre):
+    """Ciclos entre contactos. Con un solo contacto (video corto), un ciclo de la duración
+    estimada que empiece o termine en él, si se sale del video menos del 10 % (esa parte
+    toma el primer o último cuadro); si no, todo el tramo."""
+    ciclos = cin.armar_ciclos(contactos, np.array([]))
+    if ciclos:
+        return ciclos, False
+    if periodo and contactos.size:
+        fuera = lambda t0: max(0.0, t[0] - t0) + max(0.0, t0 + periodo - t[-1])  # noqa: E731
+        t0 = min((c for tc in contactos for c in (tc, tc - periodo)), key=fuera)
+        if fuera(t0) <= 0.1 * periodo:
+            print(f"Aviso ({nombre}): un solo contacto inicial; el ciclo se completa con la duración "
+                  f"estimada ({periodo:.2f} s). Grabe al menos dos ciclos completos.")
+            return [(t0, t0 + periodo, np.nan)], True
+    return _ciclos_o_tramo(contactos, np.array([]), t, nombre)
+
+
+def _escala_frontal(pos, t, fps, periodo, reposo, estatura_m):
+    """Metros por píxel en cada cuadro (la distancia a la cámara cambia durante la caminata).
+
+    El tamaño aparente del sujeto se sigue con el tronco (hombros a caderas, sin
+    marcadores) o con el ancho entre los marcadores de cadera, promediado sobre un
+    ciclo para quitar la oscilación de la marcha. La escala absoluta sale de la
+    estatura: de pie, cadera-tobillo = 0.491 H (Winter, 2009), medida en el reposo
+    inicial o, si no lo hay, con la mediana de la pierna más extendida de cada cuadro.
+    """
+    hombros = [pos.get(f"{p}_hombro") for p in PIERNAS]
+    if all(h is not None and not np.isnan(h).all() for h in hombros):
+        tam = 0.5 * (pos["derecha_cadera"][:, 1] + pos["izquierda_cadera"][:, 1]
+                     - hombros[0][:, 1] - hombros[1][:, 1])
+        referencia = "tronco (hombros a caderas)"
+    else:
+        tam = np.abs(pos["derecha_cadera"][:, 0] - pos["izquierda_cadera"][:, 0])
+        referencia = "ancho entre los marcadores de cadera"
+    tam = cin.suavizar_lento(tam, fps, periodo or 1.0)
+    pierna = {p: np.linalg.norm(pos[f"{p}_tobillo"] - pos[f"{p}_cadera"], axis=1) for p in PIERNAS}
+    if reposo is not None:
+        proporcion = float(np.median(0.5 * (pierna["derecha"] + pierna["izquierda"])[reposo] / tam[reposo]))
+        calibracion = "pierna de pie en el reposo inicial = 0.491 H"
+    else:
+        proporcion = float(np.median(np.maximum(pierna["derecha"], pierna["izquierda"]) / tam))
+        calibracion = "pierna más extendida de cada cuadro = 0.491 H (sin reposo inicial)"
+    m_por_px = cin.PIERNA_H * estatura_m / (proporcion * tam)
+    info = {
+        "metodo": f"estatura {estatura_m:g} m; {calibracion}; tamaño seguido con el {referencia}",
+        "m_por_px_inicio": round(float(m_por_px[0]), 7),
+        "m_por_px_fin": round(float(m_por_px[-1]), 7),
+        "cambio_tamano_pct": round(float(100 * (m_por_px[0] / m_por_px[-1] - 1)), 1),
+    }
+    return m_por_px, info
+
+
+def procesar_frontal(crudo, fps, args):
+    """Experimento 2 con video frontal: alturas, distancias entre articulaciones y ángulos frontales.
+
+    La cámara puede moverse con el sujeto, así que nada se mide contra un punto fijo de
+    la imagen: en cada cuadro las alturas se toman sobre el tobillo más bajo (el pie
+    apoyado) y se escalan a metros con la estatura (escala por cuadro). Cada altura se
+    expresa como cambio respecto a la postura de pie del inicio del video.
+    """
+    pose = args.metodo == "sin-marcadores"
+    prefijos = [f"{p}_{a}" for p in PIERNAS for a in ARTICULACIONES]
+    opcionales = [f"{p}_hombro" for p in PIERNAS] if pose and "derecha_hombro_x" in crudo else []
+    crudo, t, fps, pos_crudo, pos = _preparar(crudo, fps, prefijos + opcionales, args.fc, opcionales)
+    laterales = _laterales(args.frente)
+    H = args.estatura_m
+    y = {f"{p}_{a}": pos[f"{p}_{a}"][:, 1] for p in PIERNAS for a in ARTICULACIONES}
+
+    pierna_px = np.median([np.linalg.norm(pos[f"{p}_tobillo"] - pos[f"{p}_cadera"], axis=1) for p in PIERNAS])
+    reposo = cin.reposo_inicial((y["derecha_tobillo"] - y["izquierda_tobillo"]) / pierna_px, fps)
+    caminando = slice(reposo.stop if reposo is not None else 0, None)
+    periodo = cin.periodo_frontal(t[caminando], y["derecha_tobillo"][caminando], y["izquierda_tobillo"][caminando],
+                                  fps, args.frente)
+    m_por_px, escala = _escala_frontal(pos, t, fps, periodo, reposo, H)
+    y_cadera = 0.5 * (y["derecha_cadera"] + y["izquierda_cadera"])
+    contactos = {p: cin.detectar_contactos_frontal(t[caminando], y[f"{p}_tobillo"][caminando], y_cadera[caminando],
+                                                   m_por_px[caminando], fps, periodo, args.frente) for p in PIERNAS}
+    y_suelo = np.maximum(y["derecha_tobillo"], y["izquierda_tobillo"])     # pie apoyado
+    if reposo is not None:
+        referencia = (f"postura de pie medida al inicio del video ({t[reposo][0]:.2f}–{t[reposo][-1]:.2f} s)")
+    else:
+        referencia = "postura de pie estimada con la estatura (Winter, 2009): el video no empieza con la persona quieta"
+        print("Aviso: el video no empieza con la persona de pie y quieta; la postura de pie se estima con la "
+              "estatura. Para medirla, grabe 2 s de pie antes de caminar.")
+
+    series, norm, ciclos_por_pierna, por_pierna, supuestos, de_pie = {}, {}, {}, {}, {}, {}
     for pierna in PIERNAS:
         xy = {a: pos[f"{pierna}_{a}"] for a in ARTICULACIONES}
-        s = {}
+        s, de_pie[pierna] = {}, {}
         for art in ARTICULACIONES:
             s[f"{art}_x"], s[f"{art}_y"] = xy[art][:, 0], xy[art][:, 1]
-            s[f"altura_{art}"] = (y_suelo - xy[art][:, 1]) * factor
+            s[f"altura_suelo_{art}"] = (y_suelo - xy[art][:, 1]) * m_por_px
+            ref = (float(np.median(s[f"altura_suelo_{art}"][reposo])) if reposo is not None
+                   else (cin.ALTURA_DE_PIE_H[art] - cin.ALTURA_DE_PIE_H["tobillo"]) * H)
+            s[f"altura_{art}"] = s[f"altura_suelo_{art}"] - ref
+            de_pie[pierna][f"altura_suelo_{art}"] = round(ref, 4)
+        for a, b in SEGMENTOS:
+            s[f"segmento_{a}_{b}"] = (xy[b][:, 1] - xy[a][:, 1]) * m_por_px
+            ref = (float(np.median(s[f"segmento_{a}_{b}"][reposo])) if reposo is not None
+                   else (cin.ALTURA_DE_PIE_H[a] - cin.ALTURA_DE_PIE_H[b]) * H)
+            de_pie[pierna][f"segmento_{a}_{b}"] = round(ref, 4)
         for art, v in cin.angulos_frontales(xy["cadera"], xy["rodilla"], xy["tobillo"], laterales[pierna]).items():
             s[f"frontal_{art}"] = v
-        contactos, _ = cin.detectar_contactos_altura(t, s["altura_tobillo"], fps)
-        ciclos, supuestos[pierna] = _ciclos_o_tramo(contactos, np.array([]), t, f"pierna {pierna}")
+        ciclos, supuestos[pierna] = _ciclos_frontal(contactos[pierna], periodo, t[caminando], f"pierna {pierna}")
         series[pierna], ciclos_por_pierna[pierna] = s, ciclos
-        norm[pierna] = {"altura": {}, "frontal": {}}
+        normalizar = lambda senal: cin.normalizar_ciclos(t, senal, ciclos)  # noqa: E731
+        norm[pierna] = {"altura": {}, "segmento": {}, "frontal": {}}
         for art in ARTICULACIONES:
-            norm[pierna]["altura"][art] = cin.normalizar_ciclos(t, s[f"altura_{art}"], ciclos)
+            norm[pierna]["altura"][art] = normalizar(s[f"altura_{art}"])
+        for a, b in SEGMENTOS:
+            norm[pierna]["segmento"][f"{a}_{b}"] = normalizar(s[f"segmento_{a}_{b}"])
         for art in ("cadera", "rodilla"):
-            norm[pierna]["frontal"][art] = cin.normalizar_ciclos(t, s[f"frontal_{art}"], ciclos)
+            norm[pierna]["frontal"][art] = normalizar(s[f"frontal_{art}"])
         por_pierna[pierna] = {"ciclos": len(ciclos), "apoyo_pct": None, "origen": "medida"}
+    unidad = "m"
 
     duraciones = np.array([c[1] - c[0] for p in PIERNAS for c in ciclos_por_pierna[p]])
     resumen = {
@@ -438,22 +530,41 @@ def procesar_frontal(crudo, fps, args):
         "tramo_tomado_como_un_ciclo": supuestos,
         "duracion_ciclo_s": [round(float(duraciones.mean()), 3), round(float(duraciones.std()), 3)],
         "cadencia_pasos_min": round(float(120.0 / duraciones.mean()), 1),
+        "estatura_m": H,
         "unidad_altura": unidad,
+        "altura_relativa": True,
+        "referencia_altura": referencia,
+        "de_pie_m": de_pie,
         "escala": escala,
         "por_pierna": por_pierna,
     }
+    datos = _datos(t, crudo, series, unidad, ("frontal",))
+    datos = datos.rename(columns={f"{p}_{a}_altura_m": f"{p}_{a}_cambio_altura_m" for p in PIERNAS for a in ARTICULACIONES})
+    for p in PIERNAS:
+        for a in ARTICULACIONES:
+            datos[f"{p}_{a}_altura_sobre_pie_apoyado_m"] = series[p][f"altura_suelo_{a}"]
+        for a, b in SEGMENTOS:
+            datos[f"{p}_distancia_vertical_{a}_{b}_m"] = series[p][f"segmento_{a}_{b}"]
+    datos["escala_m_por_px"] = m_por_px
+
     nombre = Path(str(args.fuente)).name
-    paneles = [(f"Altura {a} [{unidad}]", [(f"Pierna {p}", series[p][f"altura_{a}"], graficas.COLOR_PIERNA[p], 2)
-                                           for p in PIERNAS]) for a in ARTICULACIONES]
+    paneles = [(f"Cambio de altura\n{a} [m]", [(f"Pierna {p}", series[p][f"altura_{a}"], graficas.COLOR_PIERNA[p], 2)
+                                               for p in PIERNAS]) for a in ARTICULACIONES]
+    paneles.append(("Escala [mm/px]\n(distancia a la cámara)", [("Escala", 1000 * m_por_px, graficas.TENUE, 1.5)]))
+    reposo_s = (t[reposo][0], t[reposo][-1]) if reposo is not None else None
     return {
-        "datos": _datos(t, crudo, series, unidad, ("frontal",)), "tabla": _tabla_normalizada(norm),
+        "datos": datos, "tabla": _tabla_normalizada(norm),
         "ciclos_por_pierna": ciclos_por_pierna, "resumen": resumen, "crudo": crudo,
         "figuras": [
+            ("graficas_1_6.png", graficas.FILAS_12[:3], ("altura",), True,
+             f"Gráficas 1 a 6 · cambio de altura respecto a la postura de pie · {nombre} · media ± DE"),
             ("graficas_frontal.png", graficas.FILAS_FRONTAL, ("altura", "frontal"), False,
              f"Plano frontal · {nombre} · media ± DE por pierna"),
+            ("distancias_articulaciones.png", graficas.FILAS_SEGMENTOS, ("segmento",), False,
+             f"Distancia vertical entre articulaciones · {nombre} · media ± DE por pierna"),
         ],
         "serie": (t, paneles, [c[0] for c in ciclos_por_pierna["derecha"]],
-                  f"Alturas contra el tiempo · {nombre} · contactos de la pierna derecha"),
+                  f"Alturas contra el tiempo · {nombre} · contactos de la pierna derecha", reposo_s),
     }
 
 
@@ -492,8 +603,8 @@ def guardar(res, args):
         curvas = graficas.curvas_desde_tabla(res["tabla"], res["resumen"], tipos)
         graficas.figura_ciclos(filas, curvas, titulo, s / archivo, s / "graficas" if sueltas else None,
                                numerar=sueltas, normal=normal)
-    t, paneles, contactos, titulo = res["serie"]
-    graficas.serie_temporal(t, paneles, contactos, titulo, s / "serie_temporal.png")
+    t, paneles, contactos, titulo, *reposo = res["serie"]
+    graficas.serie_temporal(t, paneles, contactos, titulo, s / "serie_temporal.png", reposo[0] if reposo else None)
     if res["resumen"]["vista"] == "lateral":
         ruta, _ = comparacion.generar(s, args.referencia)
         print(f"Comparación con la marcha ideal: {ruta}")
@@ -532,7 +643,8 @@ def main():
     p.add_argument("--diametro-marcador-cm", type=float, default=None,
                    help="diámetro real de los marcadores para expresar las alturas en cm")
     p.add_argument("--estatura-m", type=float, default=None,
-                   help="estatura del sujeto para expresar las alturas en cm (si no se da el diámetro)")
+                   help="estatura del sujeto en metros; obligatoria en vista frontal (escala de las alturas); "
+                        "en lateral, opcional para expresar las alturas en cm")
     p.add_argument("--grabar", action="store_true", help="guardar captura.mp4 mientras se almacenan los datos")
     p.add_argument("--auto-detener", type=float, default=2.0,
                    help="terminar si no se detecta ninguna articulación durante estos segundos (0 = nunca)")
@@ -543,6 +655,10 @@ def main():
     p.add_argument("--video-anotado", action="store_true", help="guardar video_anotado.mp4")
     p.add_argument("--salida", type=Path, default=None, help="carpeta de resultados")
     args = p.parse_args()
+    if args.vista == "frontal" and not args.estatura_m:
+        p.error("la vista frontal necesita la estatura del sujeto: --estatura-m (p. ej. 1.70)")
+    if args.estatura_m is not None and not 0.5 <= args.estatura_m <= 2.5:
+        p.error("--estatura-m va en metros, p. ej. 1.70")
     if args.salida is None:
         nombre = "camara" if str(args.fuente).isdigit() else Path(args.fuente).stem
         if args.metodo == "sin-marcadores":
