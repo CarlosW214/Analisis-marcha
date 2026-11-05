@@ -25,6 +25,7 @@ import cinematica as cin
 import comparacion
 import graficas
 import sin_marcadores as sm
+import video_alturas
 from deteccion import ARTICULACIONES, PIERNAS, DetectorMarcadores, abrir_fuente, cargar_umbrales, leer_fotogramas
 from interfaz import COLOR_PIERNA_BGR, Interfaz, dibujar_pierna
 
@@ -534,6 +535,8 @@ def procesar_frontal(crudo, fps, args):
         "unidad_altura": unidad,
         "altura_relativa": True,
         "referencia_altura": referencia,
+        "reposo_s": [round(float(t[reposo][0]), 3), round(float(t[reposo][-1]), 3)] if reposo is not None else None,
+        "rotacion": getattr(args, "rotacion", "auto"),
         "de_pie_m": de_pie,
         "escala": escala,
         "por_pierna": por_pierna,
@@ -608,6 +611,14 @@ def guardar(res, args):
     if res["resumen"]["vista"] == "lateral":
         ruta, _ = comparacion.generar(s, args.referencia)
         print(f"Comparación con la marcha ideal: {ruta}")
+    else:
+        print("Generando el video que muestra cómo se miden las alturas...", flush=True)
+        try:
+            ruta = video_alturas.generar(s)
+            if ruta:
+                print(f"Video de alturas: {ruta}")
+        except Exception as e:          # el análisis ya está guardado; el video es solo explicativo
+            print(f"Aviso: no se pudo generar video_alturas.mp4 ({e}).")
 
 
 def main():

@@ -329,6 +329,9 @@ class Lanzador(tk.Tk):
                 self._ver_comparacion()
             else:
                 self._abrir_carpeta()
+                video = self.carpeta_resultados / "video_alturas.mp4"
+                if video.is_file():
+                    os.startfile(video)
         elif codigo != 0:
             messagebox.showerror("El análisis no terminó",
                                  "Revise los mensajes de la parte inferior para ver la causa.")

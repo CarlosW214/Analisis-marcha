@@ -83,6 +83,12 @@ de frente a la cámara. Como la cámara se mueve, nada se mide contra un punto f
 5. **Contacto inicial:** máximo de la altura del tobillo respecto a la cadera (el pie que avanza baja
    en la imagen hasta apoyarse). Revisado contra los cuadros del video: ±0.1 s.
 
+**`video_alturas.mp4`** muestra cómo se mide cada cuadro: la línea amarilla es el suelo de ese
+cuadro (tobillo apoyado), las líneas verticales van del suelo a cada articulación con su cambio de
+altura en m, la marca blanca es dónde estaba esa articulación de pie y la línea gris del tronco es
+la que sigue la escala; a la derecha, la tabla de valores. Se genera al terminar el análisis frontal
+(el lanzador lo abre solo) o con `py video_alturas.py resultados/<carpeta>`.
+
 Archivos: `graficas_1_6.png` y `graficas/g01…g06` (gráficas 1 a 6 de la práctica),
 `graficas_frontal.png` (alturas y ángulos frontales), `distancias_articulaciones.png`,
 `serie_temporal.png` (alturas contra el tiempo, tramo de pie sombreado y escala). En
@@ -206,6 +212,7 @@ Las 12 gráficas (`graficas_12.png`) también muestran la banda normal en los á
 | `serie_temporal.png` | ángulos (o alturas) contra el tiempo con los contactos iniciales |
 | `resumen.json` | cadencia, ciclo, apoyo, rangos articulares, escala |
 | `video_anotado.mp4` | con `--video-anotado`: video con puntos, segmentos y panel de ángulos |
+| `video_alturas.mp4` | vista frontal: cómo se mide cada altura, cuadro por cuadro |
 | `marcha.bvh`, `marcha_bvh.json` | animación exportada y su escala / longitudes |
 | `marcha_3d.blend`, `marcha_3d.fbx` | escena de Blender con el modelo animado |
 | `render_lateral.mp4`, `render_perspectiva.mp4` | render del modelo |
